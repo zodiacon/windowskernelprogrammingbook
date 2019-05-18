@@ -38,7 +38,7 @@
     <ClCompile Include="FastMutex.cpp" />
     <ResourceCompile Include="DelProtect.rc" />
     <ClCompile Include="DelProtect.cpp" />
-    <Inf Include="DelProtect.inf" />
+    <Inf Include="DelProtect2.inf" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{1CD1295B-E6CA-480A-8F17-6093F8A525E9}</ProjectGuid>

@@ -674,6 +674,8 @@ FLT_PREOP_CALLBACK_STATUS DelProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFLT_REL
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 
 	auto& params = Data->Iopb->Parameters.Create;
+	auto returnStatus = FLT_PREOP_SUCCESS_NO_CALLBACK;
+
 	if (params.Options & FILE_DELETE_ON_CLOSE) {
 		// delete operation
 		KdPrint(("Delete on close: %wZ\n", &FltObjects->FileObject->FileName));
@@ -694,17 +696,15 @@ FLT_PREOP_CALLBACK_STATUS DelProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFLT_REL
 			NT_ASSERT(exeName);
 
 			if (exeName && FindExecutable(exeName + 1)) {	// skip backslash
-				// prevent deletion by removing the flag
-				params.Options &= ~FILE_DELETE_ON_CLOSE;
-				// update the filter manager of the change
-				FltSetCallbackDataDirty(Data);
+				Data->IoStatus.Status = STATUS_ACCESS_DENIED;
 				KdPrint(("Prevented delete in IRP_MJ_CREATE\n"));
+				returnStatus = FLT_PREOP_COMPLETE;
 			}
 		}
 		ExFreePool(processName);
 
 	}
-	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	return returnStatus;
 }
 
 
@@ -747,7 +747,7 @@ FLT_PREOP_CALLBACK_STATUS DelProtectPreSetInformation(PFLT_CALLBACK_DATA Data, P
 			processName, size - sizeof(WCHAR), nullptr);
 
 		if (NT_SUCCESS(status) && processName->Length > 0) {
-			KdPrint(("Delete operation from %wZ\n", processName));
+			KdPrint(("Delete operation from %wZ\n"));
 
 			auto exeName = ::wcsrchr(processName->Buffer, L'\\');
 

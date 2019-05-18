@@ -46,8 +46,7 @@ ULONG gTraceFlags = 0;
 	Prototypes
 *************************************************************************/
 
-
-
+bool IsDeleteAllowed(const PEPROCESS Process);
 
 EXTERN_C_START
 
@@ -629,40 +628,25 @@ Return Value:
 
 _Use_decl_annotations_
 FLT_PREOP_CALLBACK_STATUS DelProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID*) {
-    UNREFERENCED_PARAMETER(FltObjects);
+	UNREFERENCED_PARAMETER(FltObjects);
 
-    if (Data->RequestorMode == KernelMode)
-        return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	if (Data->RequestorMode == KernelMode)
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 
-    auto& params = Data->Iopb->Parameters.Create;
-    if (params.Options & FILE_DELETE_ON_CLOSE) {
-        // delete operation
-        KdPrint(("Delete on close: %wZ\n", &Data->Iopb->TargetFileObject->FileName));
+	auto& params = Data->Iopb->Parameters.Create;
+	auto returnStatus = FLT_PREOP_SUCCESS_NO_CALLBACK;
 
-        auto size = 300;	// some arbitrary size enough for cmd.exe command line
-        auto processName = (UNICODE_STRING*)ExAllocatePool(PagedPool, size);
-        if (processName == nullptr)
-            return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	if (params.Options & FILE_DELETE_ON_CLOSE) {
+		// delete operation
+		KdPrint(("Delete on close: %wZ\n", &Data->Iopb->TargetFileObject->FileName));
 
-        RtlZeroMemory(processName, size);	// ensure string will be NULL-terminated
-        auto status = ZwQueryInformationProcess(NtCurrentProcess(), ProcessImageFileName,
-            processName, size - sizeof(WCHAR), nullptr);
-
-        if (NT_SUCCESS(status)) {
-            KdPrint(("Delete operation from %wZ\n", processName));
-
-            if (wcsstr(processName->Buffer, L"\\System32\\cmd.exe") != nullptr ||
-                wcsstr(processName->Buffer, L"\\SysWOW64\\cmd.exe") != nullptr) {
-                // prevent deletion by removing the flag
-                params.Options &= ~FILE_DELETE_ON_CLOSE;
-                // update the filter manager of the change
-                FltSetCallbackDataDirty(Data);
-            }
-        }
-        ExFreePool(processName);
-
-    }
-    return FLT_PREOP_SUCCESS_NO_CALLBACK;
+		if (!IsDeleteAllowed(PsGetCurrentProcess())) {
+			Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+			returnStatus = FLT_PREOP_COMPLETE;
+			KdPrint(("Prevent delete from IRP_MJ_CREATE by cmd.exe\n"));
+		}
+	}
+	return returnStatus;
 }
 
 
@@ -670,5 +654,65 @@ FLT_PREOP_CALLBACK_STATUS DelProtectPreSetInformation(_Inout_ PFLT_CALLBACK_DATA
 	UNREFERENCED_PARAMETER(FltObjects);
 	UNREFERENCED_PARAMETER(Data);
 
-	return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	auto& params = Data->Iopb->Parameters.SetFileInformation;
+
+	if (params.FileInformationClass != FileDispositionInformation && params.FileInformationClass != FileDispositionInformationEx) {
+		// not a delete operation
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+	}
+
+	auto info = (FILE_DISPOSITION_INFORMATION*)params.InfoBuffer;
+	if (!info->DeleteFile)
+		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+
+	auto returnStatus = FLT_PREOP_SUCCESS_NO_CALLBACK;
+
+	// what process did this originate from?
+	auto process = PsGetThreadProcess(Data->Thread);
+	NT_ASSERT(process);
+
+	if (!IsDeleteAllowed(process)) {
+		Data->IoStatus.Status = STATUS_ACCESS_DENIED;
+		returnStatus = FLT_PREOP_COMPLETE;
+		KdPrint(("Prevent delete from IRP_MJ_SET_INFORMATION by cmd.exe\n"));
+	}
+
+	return returnStatus;
+}
+
+bool IsDeleteAllowed(const PEPROCESS Process) {
+	bool currentProcess = PsGetCurrentProcess() == Process;
+	HANDLE hProcess;
+	if (currentProcess)
+		hProcess = NtCurrentProcess();
+	else {
+		auto status = ObOpenObjectByPointer(Process, OBJ_KERNEL_HANDLE,
+			nullptr, 0, nullptr, KernelMode, &hProcess);
+		if (!NT_SUCCESS(status))
+			return true;
+	}
+
+	auto size = 300;
+	bool allowDelete = true;
+	auto processName = (UNICODE_STRING*)ExAllocatePool(PagedPool, size);
+
+	if (processName) {
+		RtlZeroMemory(processName, size);	// ensure string will be NULL-terminated
+		auto status = ZwQueryInformationProcess(hProcess, ProcessImageFileName,
+			processName, size - sizeof(WCHAR), nullptr);
+
+		if (NT_SUCCESS(status)) {
+			KdPrint(("Delete operation from %wZ\n", processName));
+
+			if (wcsstr(processName->Buffer, L"\\System32\\cmd.exe") != nullptr ||
+				wcsstr(processName->Buffer, L"\\SysWOW64\\cmd.exe") != nullptr) {
+				allowDelete = false;
+			}
+		}
+		ExFreePool(processName);
+	}
+	if (!currentProcess)
+		ZwClose(hProcess);
+
+	return allowDelete;
 }
