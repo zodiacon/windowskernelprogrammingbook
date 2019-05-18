@@ -14,6 +14,8 @@ extern "C" NTSTATUS
 DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath) {
 	UNREFERENCED_PARAMETER(RegistryPath);
 
+	KdPrint(("PriorityBooster DriverEntry started\n"));
+
 	DriverObject->DriverUnload = PriorityBoosterUnload;
 
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = PriorityBoosterCreateClose;
@@ -37,6 +39,8 @@ DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 		return status;
 	}
 
+	KdPrint(("PriorityBooster DriverEntry completed successfully\n"));
+
 	return STATUS_SUCCESS;
 }
 
@@ -47,6 +51,8 @@ void PriorityBoosterUnload(_In_ PDRIVER_OBJECT DriverObject) {
 
 	// delete device object
 	IoDeleteDevice(DriverObject->DeviceObject);
+
+	KdPrint(("PriorityBooster unloaded\n"));
 }
 
 _Use_decl_annotations_

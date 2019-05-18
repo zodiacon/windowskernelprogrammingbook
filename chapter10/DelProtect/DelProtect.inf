@@ -1,0 +1,93 @@
+;;;
+;;; DelProtect
+;;;
+
+[Version]
+Signature   = "$Windows NT$"
+Class       = "Undelete"
+ClassGuid   = {fe8f1572-c67a-48c0-bbac-0b5c6d66cafb}
+Provider    = %ManufacturerName%
+DriverVer   = 
+CatalogFile = DelProtect.cat
+
+[DestinationDirs]
+DefaultDestDir          = 12
+MiniFilter.DriverFiles  = 12            ;%windir%\system32\drivers
+
+;;
+;; Default install sections
+;;
+
+[DefaultInstall]
+OptionDesc          = %ServiceDescription%
+CopyFiles           = MiniFilter.DriverFiles
+
+[DefaultInstall.Services]
+AddService          = %ServiceName%,,MiniFilter.Service
+
+;;
+;; Default uninstall sections
+;;
+
+[DefaultUninstall]
+DelFiles   = MiniFilter.DriverFiles
+
+[DefaultUninstall.Services]
+DelService = %ServiceName%,0x200      ;Ensure service is stopped before deleting
+
+;
+; Services Section
+;
+
+[MiniFilter.Service]
+DisplayName      = %ServiceName%
+Description      = %ServiceDescription%
+ServiceBinary    = %12%\%DriverName%.sys        ;%windir%\system32\drivers\
+Dependencies     = "FltMgr"
+ServiceType      = 2                            ;SERVICE_FILE_SYSTEM_DRIVER
+StartType        = 3                            ;SERVICE_DEMAND_START
+ErrorControl     = 1                            ;SERVICE_ERROR_NORMAL
+LoadOrderGroup = "FS Undelete filters"
+AddReg           = MiniFilter.AddRegistry
+
+;
+; Registry Modifications
+;
+
+[MiniFilter.AddRegistry]
+HKR,,"DebugFlags",0x00010001 ,0x0
+HKR,,"SupportedFeatures",0x00010001,0x3
+HKR,"Instances","DefaultInstance",0x00000000,%DefaultInstance%
+HKR,"Instances\"%Instance1.Name%,"Altitude",0x00000000,%Instance1.Altitude%
+HKR,"Instances\"%Instance1.Name%,"Flags",0x00010001,%Instance1.Flags%
+
+;
+; Copy Files
+;
+
+[MiniFilter.DriverFiles]
+%DriverName%.sys
+
+[SourceDisksFiles]
+DelProtect.sys = 1,,
+
+[SourceDisksNames]
+1 = %DiskId1%,,,
+
+;;
+;; String Section
+;;
+
+[Strings]
+; TODO - Add your manufacturer
+ManufacturerName        = "WindowsDriversBook"
+ServiceDescription      = "DelProtect Mini-Filter Driver"
+ServiceName             = "DelProtect"
+DriverName              = "DelProtect"
+DiskId1                 = "DelProtect Device Installation Disk"
+
+;Instances specific information.
+DefaultInstance         = "DelProtect Instance"
+Instance1.Name          = "DelProtect Instance"
+Instance1.Altitude       = "345101"
+Instance1.Flags         = 0x0              ; Allow all attachments
