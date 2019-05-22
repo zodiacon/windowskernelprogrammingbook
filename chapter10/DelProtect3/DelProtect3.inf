@@ -69,7 +69,7 @@ HKR,"Instances\"%Instance1.Name%,"Flags",0x00010001,%Instance1.Flags%
 %DriverName%.sys
 
 [SourceDisksFiles]
-DelProtect2.sys = 1,,
+DelProtect3.sys = 1,,
 
 [SourceDisksNames]
 1 = %DiskId1%,,,
@@ -82,12 +82,12 @@ DelProtect2.sys = 1,,
 ; TODO - Add your manufacturer
 ManufacturerName        = "WindowsDriversBook"
 ServiceDescription      = "DelProtect Mini-Filter Driver"
-ServiceName             = "DelProtect2"
-DriverName              = "DelProtect2"
+ServiceName             = "DelProtect3"
+DriverName              = "DelProtect3"
 DiskId1                 = "DelProtect Device Installation Disk"
 
 ;Instances specific information.
 DefaultInstance         = "DelProtect Instance"
 Instance1.Name          = "DelProtect Instance"
-Instance1.Altitude       = "345102"
+Instance1.Altitude       = "345103"
 Instance1.Flags         = 0x0              ; Allow all attachments

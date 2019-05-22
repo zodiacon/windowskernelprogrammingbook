@@ -110,7 +110,7 @@ NTSTATUS SysMonRead(PDEVICE_OBJECT, PIRP Irp) {
 		status = STATUS_INSUFFICIENT_RESOURCES;
 	}
 	else {
-		AutoLock lock(g_Globals.Mutex);
+		AutoLock locker(g_Globals.Mutex);
 		while (true) {
 			if (IsListEmpty(&g_Globals.ItemsHead))	// can also check g_Globals.ItemCount
 				break;
@@ -260,7 +260,7 @@ void OnImageLoadNotify(PUNICODE_STRING FullImageName, HANDLE ProcessId, PIMAGE_I
 }
 
 void PushItem(LIST_ENTRY * entry) {
-	AutoLock<FastMutex> lock(g_Globals.Mutex);
+	AutoLock<FastMutex> locker(g_Globals.Mutex);
 	if (g_Globals.ItemCount > 1024) {
 		// too many items, remove oldest one
 		auto head = RemoveHeadList(&g_Globals.ItemsHead);
