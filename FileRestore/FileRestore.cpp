@@ -30,14 +30,14 @@ int wmain(int argc, const wchar_t* argv[]) {
 	if (!::GetFileSizeEx(hSource, &size))
 		return Error("Failed to get file size");
 
-	DWORD bufferSize = 1 << 21;	// 2 MB
+	ULONG bufferSize = (ULONG)min((LONGLONG)1 << 21, size.QuadPart);
 	void* buffer = VirtualAlloc(nullptr, bufferSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (!buffer)
 		return Error("Failed to allocate buffer");
 
 	DWORD bytes;
 	while (size.QuadPart > 0) {
-		if (!::ReadFile(hSource, buffer, min((LONGLONG)bufferSize, size.QuadPart), &bytes, nullptr))
+		if (!::ReadFile(hSource, buffer, (DWORD)(min((LONGLONG)bufferSize, size.QuadPart)), &bytes, nullptr))
 			return Error("Failed to read data");
 
 		if (!::WriteFile(hTarget, buffer, bytes, &bytes, nullptr))

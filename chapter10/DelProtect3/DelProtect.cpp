@@ -688,6 +688,8 @@ Return Value:
 
 _Use_decl_annotations_
 FLT_PREOP_CALLBACK_STATUS DelProtectPreCreate(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID*) {
+	UNREFERENCED_PARAMETER(FltObjects);
+
 	if (Data->RequestorMode == KernelMode)
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
 

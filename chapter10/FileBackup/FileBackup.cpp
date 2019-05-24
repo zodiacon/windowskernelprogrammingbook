@@ -36,8 +36,8 @@ ULONG gTraceFlags = 0;
 
 struct FileContext {
 	Mutex Lock;
-	BOOLEAN Written;
 	UNICODE_STRING FileName;
+	BOOLEAN Written;
 };
 
 NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS FltObjects);
@@ -233,8 +233,10 @@ Return Value:
 
 	PAGED_CODE();
 
-	if (VolumeFilesystemType != FLT_FSTYPE_NTFS)
+	if (VolumeFilesystemType != FLT_FSTYPE_NTFS) {
+		KdPrint(("Not attaching to non-NTFS volume\n"));
 		return STATUS_FLT_DO_NOT_ATTACH;
+	}
 
 	return STATUS_SUCCESS;
 }
@@ -318,10 +320,10 @@ FLT_POSTOP_CALLBACK_STATUS FileBackupPostCreate(PFLT_CALLBACK_DATA Data, PCFLT_R
 		return FLT_POSTOP_FINISHED_PROCESSING;
 
 	const auto& params = Data->Iopb->Parameters.Create;
-	if (Data->RequestorMode == KernelMode ||
-		(params.SecurityContext->DesiredAccess & FILE_WRITE_DATA) == 0 ||
-		!NT_SUCCESS(Data->IoStatus.Status) ||
-		Data->IoStatus.Information == FILE_CREATED) {
+	if (Data->RequestorMode == KernelMode 
+		|| (params.SecurityContext->DesiredAccess & FILE_WRITE_DATA) == 0 
+		|| !NT_SUCCESS(Data->IoStatus.Status)
+		|| Data->IoStatus.Information == FILE_DOES_NOT_EXIST) {
 		// kernel caller, not write access or a new file - skip
 		return FLT_POSTOP_FINISHED_PROCESSING;
 	}
@@ -515,11 +517,11 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 			&targetFileAttr,		// object attributes
 			&ioStatus,				// resulting status
 			nullptr, FILE_ATTRIBUTE_NORMAL, 	// allocation size, file attributes
-			FILE_SHARE_READ,		// share flags
+			0,		// share flags
 			FILE_OVERWRITE_IF,		// create disposition
 			FILE_SYNCHRONOUS_IO_NONALERT | FILE_SEQUENTIAL_ONLY, // create options (sync I/O)
 			nullptr, 0,		// extended attributes, EA length
-			IO_IGNORE_SHARE_ACCESS_CHECK);	// flags
+			0 /*IO_IGNORE_SHARE_ACCESS_CHECK*/);	// flags
 
 		ExFreePool(targetFileName.Buffer);
 
@@ -539,6 +541,7 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 		LARGE_INTEGER writeOffset = { 0 };
 
 		ULONG bytes;
+		auto saveSize = fileSize;
 		while (fileSize.QuadPart > 0) {
 			status = ZwReadFile(
 				hSourceFile,
@@ -573,6 +576,10 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 			writeOffset.QuadPart += bytes;
 			fileSize.QuadPart -= bytes;
 		}
+
+		FILE_END_OF_FILE_INFORMATION info;
+		info.EndOfFile = saveSize;
+		NT_VERIFY(ZwSetInformationFile(hTargetFile, &ioStatus, &info, sizeof(info), FileEndOfFileInformation));
 	} while (false);
 
 	if (buffer)
