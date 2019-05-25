@@ -183,6 +183,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FileBackupCommon.h" />
     <ClInclude Include="Mutex.h" />
     <ClInclude Include="FileNameInformation.h" />
   </ItemGroup>

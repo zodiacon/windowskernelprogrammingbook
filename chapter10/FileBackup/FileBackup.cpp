@@ -19,12 +19,15 @@ Environment:
 #include "FileNameInformation.h"
 #include "AutoLock.h"
 #include "Mutex.h"
+#include "FileBackupCommon.h"
 
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
 
 PFLT_FILTER gFilterHandle;
 ULONG_PTR OperationStatusCtx = 1;
+PFLT_PORT FilterPort;
+PFLT_PORT SendClientPort;
 
 #define PTDBG_TRACE_ROUTINES            0x00000001
 #define PTDBG_TRACE_OPERATION_STATUS    0x00000002
@@ -130,6 +133,23 @@ FileBackupPostCleanup(
 	_In_ FLT_POST_OPERATION_FLAGS Flags
 );
 
+NTSTATUS PortConnectNotify(
+	_In_ PFLT_PORT ClientPort,
+	_In_opt_ PVOID ServerPortCookie,
+	_In_reads_bytes_opt_(SizeOfContext) PVOID ConnectionContext,
+	_In_ ULONG SizeOfContext,
+	_Outptr_result_maybenull_ PVOID *ConnectionPortCookie);
+
+void PortDisconnectNotify(_In_opt_ PVOID ConnectionCookie);
+
+NTSTATUS PortMessageNotify(
+	_In_opt_ PVOID PortCookie,
+	_In_reads_bytes_opt_(InputBufferLength) PVOID InputBuffer,
+	_In_ ULONG InputBufferLength,
+	_Out_writes_bytes_to_opt_(OutputBufferLength, *ReturnOutputBufferLength) PVOID OutputBuffer,
+	_In_ ULONG OutputBufferLength,
+	_Out_ PULONG ReturnOutputBufferLength);
+
 EXTERN_C_END
 
 //
@@ -156,7 +176,6 @@ void FileContextCleanup(_In_ PFLT_CONTEXT Context, _In_ FLT_CONTEXT_TYPE /* Cont
 //
 
 CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
-
 	{ IRP_MJ_CREATE, 0, nullptr, FileBackupPostCreate },
 	{ IRP_MJ_WRITE, FLTFL_OPERATION_REGISTRATION_SKIP_PAGING_IO, FileBackupPreWrite },
 	{ IRP_MJ_CLEANUP, 0, nullptr, FileBackupPostCleanup },
@@ -169,7 +188,7 @@ CONST FLT_OPERATION_REGISTRATION Callbacks[] = {
 //
 
 const FLT_CONTEXT_REGISTRATION Contexts[] = {
-	{ FLT_FILE_CONTEXT, 0, nullptr, sizeof(FileContext), DRIVER_CONTEXT_TAG  },
+	{ FLT_FILE_CONTEXT, 0, nullptr, sizeof(FileContext), DRIVER_CONTEXT_TAG },
 	{ FLT_CONTEXT_END }
 };
 
@@ -305,6 +324,23 @@ FLT_PREOP_CALLBACK_STATUS FileBackupPreWrite(PFLT_CALLBACK_DATA Data, PCFLT_RELA
 			if (!NT_SUCCESS(status)) {
 				KdPrint(("Failed to backup file! (0x%X)\n", status));
 			}
+			else {
+				// send message to user mode
+				if (SendClientPort) {
+					USHORT nameLen = context->FileName.Length;
+					USHORT len = sizeof(FileBackupPortMessage) + nameLen;
+					auto msg = (FileBackupPortMessage*)ExAllocatePoolWithTag(PagedPool, len, DRIVER_TAG);
+					if (msg) {
+						msg->FileNameLength = nameLen / sizeof(WCHAR);
+						RtlCopyMemory(msg->FileName, context->FileName.Buffer, nameLen);
+						LARGE_INTEGER timeout;
+						timeout.QuadPart = -10000 * 100;	// 100msec
+						FltSendMessage(gFilterHandle, &SendClientPort, msg, len,
+							nullptr, nullptr, &timeout);
+						ExFreePool(msg);
+					}
+				}
+			}
 			context->Written = TRUE;
 		}
 	}
@@ -322,7 +358,6 @@ FLT_POSTOP_CALLBACK_STATUS FileBackupPostCreate(PFLT_CALLBACK_DATA Data, PCFLT_R
 	const auto& params = Data->Iopb->Parameters.Create;
 	if (Data->RequestorMode == KernelMode 
 		|| (params.SecurityContext->DesiredAccess & FILE_WRITE_DATA) == 0 
-		|| !NT_SUCCESS(Data->IoStatus.Status)
 		|| Data->IoStatus.Information == FILE_DOES_NOT_EXIST) {
 		// kernel caller, not write access or a new file - skip
 		return FLT_POSTOP_FINISHED_PROCESSING;
@@ -364,6 +399,7 @@ FLT_POSTOP_CALLBACK_STATUS FileBackupPostCreate(PFLT_CALLBACK_DATA Data, PCFLT_R
 	status = FltSetFileContext(FltObjects->Instance, FltObjects->FileObject, FLT_SET_CONTEXT_KEEP_IF_EXISTS, context, nullptr);
 	if (!NT_SUCCESS(status)) {
 		KdPrint(("Failed to set file context (0x%08X)\n", status));
+		ExFreePool(context->FileName.Buffer);
 	}
 	FltReleaseContext(context);
 
@@ -389,6 +425,36 @@ FLT_POSTOP_CALLBACK_STATUS FileBackupPostCleanup(PFLT_CALLBACK_DATA Data, PCFLT_
 	FltDeleteContext(context);
 
 	return FLT_POSTOP_FINISHED_PROCESSING;
+}
+
+_Use_decl_annotations_
+NTSTATUS PortConnectNotify(PFLT_PORT ClientPort, PVOID ServerPortCookie, PVOID ConnectionContext, ULONG SizeOfContext, PVOID* ConnectionPortCookie) {
+	UNREFERENCED_PARAMETER(ServerPortCookie);
+	UNREFERENCED_PARAMETER(ConnectionContext);
+	UNREFERENCED_PARAMETER(SizeOfContext);
+	UNREFERENCED_PARAMETER(ConnectionPortCookie);
+
+	SendClientPort = ClientPort;
+
+	return STATUS_SUCCESS;
+}
+
+void PortDisconnectNotify(PVOID ConnectionCookie) {
+	UNREFERENCED_PARAMETER(ConnectionCookie);
+
+	FltCloseClientPort(gFilterHandle, &SendClientPort);
+	SendClientPort = nullptr;
+}
+
+NTSTATUS PortMessageNotify(PVOID PortCookie, PVOID InputBuffer, ULONG InputBufferLength, PVOID OutputBuffer, ULONG OutputBufferLength, PULONG ReturnOutputBufferLength) {
+	UNREFERENCED_PARAMETER(PortCookie);
+	UNREFERENCED_PARAMETER(InputBuffer);
+	UNREFERENCED_PARAMETER(InputBufferLength);
+	UNREFERENCED_PARAMETER(OutputBuffer);
+	UNREFERENCED_PARAMETER(OutputBufferLength);
+	UNREFERENCED_PARAMETER(ReturnOutputBufferLength);
+
+	return STATUS_SUCCESS;
 }
 
 VOID
@@ -513,7 +579,7 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 			FltObjects->Filter,		// filter object
 			FltObjects->Instance,	// filter instance
 			&hTargetFile,			// resulting handle
-			FILE_WRITE_DATA | SYNCHRONIZE, // access mask
+			GENERIC_WRITE | SYNCHRONIZE, // access mask
 			&targetFileAttr,		// object attributes
 			&ioStatus,				// resulting status
 			nullptr, FILE_ATTRIBUTE_NORMAL, 	// allocation size, file attributes
@@ -537,8 +603,8 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 		}
 
 		// loop - read from source, write to target
-		LARGE_INTEGER offset = { 0 };
-		LARGE_INTEGER writeOffset = { 0 };
+		LARGE_INTEGER offset = { 0 };		// read
+		LARGE_INTEGER writeOffset = { 0 };	// write
 
 		ULONG bytes;
 		auto saveSize = fileSize;
@@ -579,7 +645,7 @@ NTSTATUS BackupFile(_In_ PUNICODE_STRING FileName, _In_ PCFLT_RELATED_OBJECTS Fl
 
 		FILE_END_OF_FILE_INFORMATION info;
 		info.EndOfFile = saveSize;
-		NT_VERIFY(ZwSetInformationFile(hTargetFile, &ioStatus, &info, sizeof(info), FileEndOfFileInformation));
+		NT_VERIFY(NT_SUCCESS(ZwSetInformationFile(hTargetFile, &ioStatus, &info, sizeof(info), FileEndOfFileInformation)));
 	} while (false);
 
 	if (buffer)
@@ -659,19 +725,35 @@ Return Value:
 		&gFilterHandle);
 
 	FLT_ASSERT(NT_SUCCESS(status));
+	if (!NT_SUCCESS(status))
+		return status;
+	
+	do {
+		UNICODE_STRING name = RTL_CONSTANT_STRING(L"\\FileBackupPort");
+		PSECURITY_DESCRIPTOR sd;
 
-	if (NT_SUCCESS(status)) {
+		status = FltBuildDefaultSecurityDescriptor(&sd, FLT_PORT_ALL_ACCESS);
+		if (!NT_SUCCESS(status))
+			break;
 
-		//
+		OBJECT_ATTRIBUTES attr;
+		InitializeObjectAttributes(&attr, &name, OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, nullptr, sd);
+
+		status = FltCreateCommunicationPort(gFilterHandle, &FilterPort, &attr, nullptr,
+			PortConnectNotify, PortDisconnectNotify, PortMessageNotify, 1);
+
+		FltFreeSecurityDescriptor(sd);
+		if (!NT_SUCCESS(status))
+			break;
+
 		//  Start filtering i/o
-		//
 
 		status = FltStartFiltering(gFilterHandle);
 
-		if (!NT_SUCCESS(status)) {
+	} while (false);
 
-			FltUnregisterFilter(gFilterHandle);
-		}
+	if (!NT_SUCCESS(status)) {
+		FltUnregisterFilter(gFilterHandle);
 	}
 
 	return status;
@@ -707,6 +789,7 @@ Return Value:
 	PT_DBG_PRINT(PTDBG_TRACE_ROUTINES,
 		("FileBackup!FileBackupUnload: Entered\n"));
 
+	FltCloseCommunicationPort(FilterPort);
 	FltUnregisterFilter(gFilterHandle);
 
 	return STATUS_SUCCESS;
