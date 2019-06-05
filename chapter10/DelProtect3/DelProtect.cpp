@@ -909,10 +909,7 @@ NTSTATUS ConvertDosNameToNtName(_In_ PCWSTR dosName, _Out_ PUNICODE_STRING ntNam
 	if (dosName[2] != L'\\' || dosName[1] != L':')
 		return STATUS_INVALID_PARAMETER;
 
-	kstring symLink(L"\\??\\");
-	//auto p = dosName;
-	//while (*p != L'\\' && *p != L'\0')
-	//	p++;
+	kstring symLink(L"\\??\\", PagedPool, DRIVER_TAG);
 
 	symLink.Append(dosName, 2);		// driver letter and colon
 

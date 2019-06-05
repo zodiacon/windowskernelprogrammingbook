@@ -33,6 +33,7 @@ public:
 	}
 
 	kstring ToLower() const;
+	kstring& ToLower();
 	kstring& Truncate(ULONG length);
 	kstring& Append(PCWSTR str, ULONG len = 0);
 

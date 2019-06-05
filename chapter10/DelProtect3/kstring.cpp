@@ -127,9 +127,13 @@ wchar_t* kstring::Allocate(size_t chars, const wchar_t* src) {
 
 kstring kstring::ToLower() const {
 	kstring temp(m_str);
-	for (size_t i = 0; i < temp.Length(); ++i)
-		temp[i] = ::towlower(temp[i]);
+	::_wcslwr(temp.m_str);
 	return temp;
+}
+
+kstring& kstring::ToLower() {
+	::_wcslwr(m_str);
+	return *this;
 }
 
 kstring& kstring::Truncate(ULONG count) {
@@ -153,7 +157,7 @@ kstring & kstring::Append(PCWSTR str, ULONG len) {
 		newBuffer = Allocate(m_Capacity = m_Len + 8, m_str);
 		newAlloc = true;
 	}
-	::wcsncat(newBuffer, str, len);
+	::wcsncat_s(newBuffer, m_Capacity, str, len);
 	if (newAlloc) {
 		Release();
 		m_str = newBuffer;
