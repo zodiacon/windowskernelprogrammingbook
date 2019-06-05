@@ -11,7 +11,7 @@ struct MonitoredDevice {
 };
 
 struct DeviceExtension {
-	int Index;
+	PDEVICE_OBJECT LowerDeviceObject;
 };
 
 class DevMonManager {
@@ -22,17 +22,15 @@ public:
 	bool RemoveDevice(PCWSTR name);
 	void RemoveAllDevices();
 
-	void Unload();
-
 	PDEVICE_OBJECT CDO;
 
+private:
+	bool RemoveDevice(int index);
+
+private:
 	MonitoredDevice Devices[MaxMonitoredDevices];
 	int MonitoredDeviceCount;
 	FastMutex Lock;
 	PDRIVER_OBJECT DriverObject;
-	bool IsMonitoring;
-
-private:
-	bool RemoveDevice(int index);
 };
 

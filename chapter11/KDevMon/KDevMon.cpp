@@ -48,9 +48,10 @@ void DevMonUnload(PDRIVER_OBJECT DriverObject) {
 	UNREFERENCED_PARAMETER(DriverObject);
 	UNICODE_STRING linkName = RTL_CONSTANT_STRING(L"\\??\\KDevMon");
 	IoDeleteSymbolicLink(&linkName);
-	g_Data.Unload();
 	NT_ASSERT(g_Data.CDO);
 	IoDeleteDevice(g_Data.CDO);
+
+	g_Data.RemoveAllDevices();
 }
 
 NTSTATUS FilterAddDevice(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT PhysicalDeviceObject) {
@@ -114,7 +115,6 @@ PCSTR MajorFunctionToString(UCHAR major) {
 		"IRP_MJ_QUERY_QUOTA",
 		"IRP_MJ_SET_QUOTA",
 		"IRP_MJ_PNP",
-		"IRP_MJ_PNP_POWER"
 	};
 	NT_ASSERT(major <= IRP_MJ_MAXIMUM_FUNCTION);
 	return strings[major];
@@ -141,9 +141,7 @@ NTSTATUS HandleFilterFunction(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 	}
 
 	auto ext = (DeviceExtension*)DeviceObject->DeviceExtension;
-	NT_ASSERT(ext->Index >= 0 && ext->Index < MaxMonitoredDevices);
 
-	auto& dev = g_Data.Devices[ext->Index];
 	auto stack = IoGetCurrentIrpStackLocation(Irp);
 	
 	auto thread = Irp->Tail.Overlay.Thread;
@@ -153,12 +151,13 @@ NTSTATUS HandleFilterFunction(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 		pid = PsGetThreadProcessId(thread);
 	}
 
-	DbgPrint("Intercepted: %wZ: PID: %d, TID: %d, MJ=%d (%s)\n", 
-		&dev.DeviceName, HandleToUlong(pid), HandleToUlong(tid), 
+	DbgPrint("Intercepted driver: %wZ: PID: %d, TID: %d, MJ=%d (%s)\n", 
+		&ext->LowerDeviceObject->DriverObject->DriverName, 
+		HandleToUlong(pid), HandleToUlong(tid), 
 		stack->MajorFunction, MajorFunctionToString(stack->MajorFunction));
 
 	IoSkipCurrentIrpStackLocation(Irp);
-	return IoCallDriver(dev.LowerDeviceObject, Irp);
+	return IoCallDriver(ext->LowerDeviceObject, Irp);
 }
 
 NTSTATUS DevMonDeviceControl(PDEVICE_OBJECT, PIRP Irp) {

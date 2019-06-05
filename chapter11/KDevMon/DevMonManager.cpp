@@ -47,7 +47,6 @@ NTSTATUS DevMonManager::AddDevice(PCWSTR name) {
 				}
 
 				auto ext = (DeviceExtension*)DeviceObject->DeviceExtension;
-				ext->Index = i;
 
 				DeviceObject->Flags |= LowerDeviceObject->Flags & (DO_BUFFERED_IO | DO_DIRECT_IO);
 
@@ -60,10 +59,11 @@ NTSTATUS DevMonManager::AddDevice(PCWSTR name) {
 				status = IoAttachDeviceToDeviceStackSafe(
 					DeviceObject,			// filter device object
 					LowerDeviceObject,		// target device object
-					&Devices[i].LowerDeviceObject);	// result
+					&ext->LowerDeviceObject);	// result
 				if (!NT_SUCCESS(status))
 					break;
 
+				Devices[i].LowerDeviceObject = ext->LowerDeviceObject;
 				// hardware based devices require this
 				DeviceObject->Flags &= ~DO_DEVICE_INITIALIZING;
 				DeviceObject->Flags |= DO_POWER_PAGABLE;
@@ -115,10 +115,6 @@ bool DevMonManager::RemoveDevice(PCWSTR name) {
 }
 
 void DevMonManager::RemoveAllDevices() {
-	Unload();
-}
-
-void DevMonManager::Unload() {
 	AutoLock locker(Lock);
 	for (int i = 0; i < MaxMonitoredDevices; i++)
 		RemoveDevice(i);
