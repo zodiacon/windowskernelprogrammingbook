@@ -35,9 +35,8 @@ NTSTATUS DevMonManager::AddDevice(PCWSTR name) {
 			do {
 				status = IoCreateDevice(DriverObject, sizeof(DeviceExtension), nullptr,
 					FILE_DEVICE_UNKNOWN, 0, FALSE, &DeviceObject);
-				if (!NT_SUCCESS(status)) {
-					return status;
-				}
+				if (!NT_SUCCESS(status))
+					break;
 
 				// allocate buffer to copy device name
 				buffer = (WCHAR*)ExAllocatePoolWithTag(PagedPool, targetName.Length, DRIVER_TAG);

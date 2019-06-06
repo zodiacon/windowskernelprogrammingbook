@@ -142,8 +142,6 @@ NTSTATUS HandleFilterFunction(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 
 	auto ext = (DeviceExtension*)DeviceObject->DeviceExtension;
 
-	auto stack = IoGetCurrentIrpStackLocation(Irp);
-	
 	auto thread = Irp->Tail.Overlay.Thread;
 	HANDLE tid = nullptr, pid = nullptr;
 	if (thread) {
@@ -151,7 +149,9 @@ NTSTATUS HandleFilterFunction(PDEVICE_OBJECT DeviceObject, PIRP Irp) {
 		pid = PsGetThreadProcessId(thread);
 	}
 
-	DbgPrint("Intercepted driver: %wZ: PID: %d, TID: %d, MJ=%d (%s)\n", 
+	auto stack = IoGetCurrentIrpStackLocation(Irp);
+
+	DbgPrint("driver: %wZ: PID: %d, TID: %d, MJ=%d (%s)\n", 
 		&ext->LowerDeviceObject->DriverObject->DriverName, 
 		HandleToUlong(pid), HandleToUlong(tid), 
 		stack->MajorFunction, MajorFunctionToString(stack->MajorFunction));
@@ -189,6 +189,7 @@ NTSTATUS DevMonDeviceControl(PDEVICE_OBJECT, PIRP Irp) {
 		case IOCTL_DEVMON_REMOVE_ALL:
 		{
 			g_Data.RemoveAllDevices();
+			status = STATUS_SUCCESS;
 			break;
 		}
 	}

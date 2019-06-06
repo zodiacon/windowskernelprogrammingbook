@@ -10,8 +10,6 @@ int Usage() {
 	printf("\tadd <devicename> (adds a device to monitor)\n");
 	printf("\tremove <devicename> (remove device from monitoring)\n");
 	printf("\tclear (remove all devices)\n");
-	printf("\tstart (start monitoring)\n");
-	printf("\tstop (stop monitoring)\n");
 
 	return 0;
 }
@@ -27,7 +25,8 @@ int wmain(int argc, const wchar_t* argv[]) {
 
 	auto& cmd = argv[1];
 
-	HANDLE hDevice = ::CreateFile(L"\\\\.\\kdevmon", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+	HANDLE hDevice = ::CreateFile(L"\\\\.\\kdevmon", GENERIC_READ | GENERIC_WRITE, 
+		FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
 	if (hDevice == INVALID_HANDLE_VALUE)
 		return Error("Failed to open device");
 
