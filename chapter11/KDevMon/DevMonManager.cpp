@@ -92,7 +92,7 @@ NTSTATUS DevMonManager::AddDevice(PCWSTR name) {
 	return STATUS_UNSUCCESSFUL;
 }
 
-int DevMonManager::FindDevice(PCWSTR name) {
+int DevMonManager::FindDevice(PCWSTR name) const {
 	UNICODE_STRING uname;
 	RtlInitUnicodeString(&uname, name);
 	for (int i = 0; i < MaxMonitoredDevices; i++) {

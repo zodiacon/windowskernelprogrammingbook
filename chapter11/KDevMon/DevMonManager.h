@@ -18,7 +18,7 @@ class DevMonManager {
 public:
 	void Init(PDRIVER_OBJECT DriverObject);
 	NTSTATUS AddDevice(PCWSTR name);
-	int FindDevice(PCWSTR name);
+	int FindDevice(PCWSTR name) const;
 	bool RemoveDevice(PCWSTR name);
 	void RemoveAllDevices();
 

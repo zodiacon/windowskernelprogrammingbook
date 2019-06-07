@@ -22,8 +22,10 @@ kstring::~kstring() {
 }
 
 void kstring::Release() {
-	if (m_str)
+	if (m_str) {
 		ExFreePoolWithTag(m_str, m_Tag);
+		m_str = nullptr;
+	}
 }
 
 kstring::kstring(kstring&& other) {
