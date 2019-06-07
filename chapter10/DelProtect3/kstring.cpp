@@ -3,7 +3,7 @@
 kstring::kstring(const wchar_t* str, POOL_TYPE pool, ULONG tag) : kstring(str, 0, pool, tag) {
 }
 
-kstring::kstring(const wchar_t * str, ULONG count, POOL_TYPE pool, ULONG tag) : m_Pool(pool), m_Tag(tag) {
+kstring::kstring(const wchar_t* str, ULONG count, POOL_TYPE pool, ULONG tag) : m_Pool(pool), m_Tag(tag) {
 	if (str) {
 		m_Len = count == 0 ? static_cast<ULONG>(wcslen(str)) : count;
 		m_Capacity = m_Len + 1;
@@ -76,11 +76,6 @@ kstring& kstring::operator=(kstring&& other) {
 }
 
 kstring::kstring(PCUNICODE_STRING str, POOL_TYPE pool, ULONG tag) : m_Pool(pool), m_Tag(tag) {
-	m_Len = str->Length / sizeof(WCHAR);
-	m_str = Allocate(m_Len, str->Buffer);
-}
-
-kstring::kstring(PUNICODE_STRING str, POOL_TYPE pool, ULONG tag) : m_Pool(pool), m_Tag(tag) {
 	m_Len = str->Length / sizeof(WCHAR);
 	m_str = Allocate(m_Len, str->Buffer);
 }

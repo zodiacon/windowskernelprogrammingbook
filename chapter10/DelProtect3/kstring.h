@@ -8,7 +8,6 @@ public:
 	kstring(const wchar_t* str, ULONG count, POOL_TYPE pool = PagedPool, ULONG tag = 0);
 	kstring(const kstring& other);
 	explicit kstring(PCUNICODE_STRING str, POOL_TYPE pool = PagedPool, ULONG tag = 0);
-	explicit kstring(PUNICODE_STRING str, POOL_TYPE pool = PagedPool, ULONG tag = 0);
 	kstring& operator= (const kstring& other);
 	kstring(kstring&& other);
 	kstring& operator=(kstring&& other);
