@@ -128,6 +128,7 @@ NTSTATUS SysMonRead(PDEVICE_OBJECT, PIRP Irp) {
 			len -= size;
 			buffer += size;
 			count += size;
+			ExFreePool(info);
 		}
 	}
 
