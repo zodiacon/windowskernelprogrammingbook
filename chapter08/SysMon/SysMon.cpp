@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "SysMon.h"
-#include "Memory.h"
 #include "SysMonCommon.h"
 #include "AutoLock.h"
 
