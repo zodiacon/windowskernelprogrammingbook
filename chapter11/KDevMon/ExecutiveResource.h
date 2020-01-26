@@ -2,6 +2,8 @@
 
 class ExecutiveResource {
 public:
+	~ExecutiveResource();
+
 	void Init();
 	void Lock();
 	void Unlock();
