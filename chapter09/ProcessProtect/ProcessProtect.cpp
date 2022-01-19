@@ -71,7 +71,8 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING) {
 		if (DeviceObject)
 			IoDeleteDevice(DeviceObject);
 		if(g_Data.RegHandle)
-			ObUnRegisterCallbacks(&g_Data.RegHandle);
+			ObUnRegisterCallbacks(g_Data.RegHandle);
+		return status;
 	}
 
 	DriverObject->DriverUnload = ProcessProtectUnload;
