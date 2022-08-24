@@ -17,6 +17,8 @@ Environment:
 #include <fltKernel.h>
 #include <dontuse.h>
 
+#define DRIVER_TAG 'ledp'
+
 extern "C" NTSTATUS ZwQueryInformationProcess(
 	_In_      HANDLE           ProcessHandle,
 	_In_      PROCESSINFOCLASS ProcessInformationClass,
@@ -694,7 +696,7 @@ bool IsDeleteAllowed(const PEPROCESS Process) {
 
 	auto size = 300;
 	bool allowDelete = true;
-	auto processName = (UNICODE_STRING*)ExAllocatePool(PagedPool, size);
+	auto processName = (UNICODE_STRING*)ExAllocatePoolWithTag(PagedPool, size, DRIVER_TAG);
 
 	if (processName) {
 		RtlZeroMemory(processName, size);	// ensure string will be NULL-terminated
@@ -704,7 +706,7 @@ bool IsDeleteAllowed(const PEPROCESS Process) {
 		if (NT_SUCCESS(status)) {
 			KdPrint(("Delete operation from %wZ\n", processName));
 
-			if (wcsstr(processName->Buffer, L"\\System32\\cmd.exe") != nullptr ||
+			if (processName->Length >0 && wcsstr(processName->Buffer, L"\\System32\\cmd.exe") != nullptr ||
 				wcsstr(processName->Buffer, L"\\SysWOW64\\cmd.exe") != nullptr) {
 				allowDelete = false;
 			}
