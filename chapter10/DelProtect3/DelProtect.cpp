@@ -2,7 +2,7 @@
 
 Module Name:
 
-	DelProtect.c
+	DelProtect.cpp
 
 Abstract:
 
@@ -425,7 +425,7 @@ Return Value:
 		symLinkCreated = true;
 
 		//
-		//  Register with FltMgr to tell it our callback routines
+		//  Register with FltMgr
 		//
 
 		status = FltRegisterFilter(DriverObject, &FilterRegistration, &gFilterHandle);

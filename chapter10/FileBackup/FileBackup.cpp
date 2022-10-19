@@ -309,7 +309,9 @@ FLT_PREOP_CALLBACK_STATUS FileBackupPreWrite(PFLT_CALLBACK_DATA Data, PCFLT_RELA
 	// get the file context if exists
 	FileContext* context;
 
-	auto status = FltGetFileContext(FltObjects->Instance, FltObjects->FileObject, (PFLT_CONTEXT*)&context);
+	auto status = FltGetFileContext(FltObjects->Instance, 
+		FltObjects->FileObject, 
+		(PFLT_CONTEXT*)&context);
 	if (!NT_SUCCESS(status) || context == nullptr) {
 		// no context, continue normally
 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
@@ -381,7 +383,9 @@ FLT_POSTOP_CALLBACK_STATUS FileBackupPostCreate(PFLT_CALLBACK_DATA Data, PCFLT_R
 
 	// allocate and initialize a file context
 	FileContext* context;
-	auto status = FltAllocateContext(FltObjects->Filter, FLT_FILE_CONTEXT, sizeof(FileContext), PagedPool, (PFLT_CONTEXT*)&context);
+	auto status = FltAllocateContext(FltObjects->Filter, 
+		FLT_FILE_CONTEXT, sizeof(FileContext), PagedPool, 
+		(PFLT_CONTEXT*)&context);
 	if (!NT_SUCCESS(status)) {
 		KdPrint(("Failed to allocate file context (0x%08X)\n", status));
 		return FLT_POSTOP_FINISHED_PROCESSING;
@@ -396,7 +400,10 @@ FLT_POSTOP_CALLBACK_STATUS FileBackupPostCreate(PFLT_CALLBACK_DATA Data, PCFLT_R
 	}
 	RtlCopyUnicodeString(&context->FileName, &fileNameInfo->Name);
 	context->Lock.Init();
-	status = FltSetFileContext(FltObjects->Instance, FltObjects->FileObject, FLT_SET_CONTEXT_KEEP_IF_EXISTS, context, nullptr);
+	status = FltSetFileContext(FltObjects->Instance, 
+		FltObjects->FileObject, 
+		FLT_SET_CONTEXT_KEEP_IF_EXISTS, 
+		context, nullptr);
 	if (!NT_SUCCESS(status)) {
 		KdPrint(("Failed to set file context (0x%08X)\n", status));
 		ExFreePool(context->FileName.Buffer);
