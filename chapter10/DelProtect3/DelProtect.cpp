@@ -929,7 +929,7 @@ NTSTATUS ConvertDosNameToNtName(_In_ PCWSTR dosName, _Out_ PUNICODE_STRING ntNam
 			break;
 
 		USHORT maxLen = 1024;	// arbitrary
-		ntName->Buffer = (WCHAR*)ExAllocatePool(PagedPool, maxLen);
+		ntName->Buffer = (WCHAR*)ExAllocatePoolWithTag(PagedPool, maxLen, DRIVER_TAG);
 		if (!ntName->Buffer) {
 			status = STATUS_INSUFFICIENT_RESOURCES;
 			break;

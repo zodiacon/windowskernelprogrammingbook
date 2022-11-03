@@ -49,7 +49,7 @@ int wmain(int argc, const wchar_t* argv[]) {
 
 	::CloseHandle(hSource);
 	::CloseHandle(hTarget);
-	::VirtualFree(buffer, 0, MEM_DECOMMIT | MEM_RELEASE);
+	::VirtualFree(buffer, 0, MEM_RELEASE);
 
 	return 0;
 }
